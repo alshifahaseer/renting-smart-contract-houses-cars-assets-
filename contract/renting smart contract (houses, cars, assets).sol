@@ -8,7 +8,7 @@ contract Renting {
         string name;
         uint256 rentPerDay;
         address renter;
-        uint256 rentedUntil;  
+        uint256 rentedUntil;
     }
 
     mapping(uint256 => Asset) public assets;
@@ -33,6 +33,17 @@ contract Renting {
         assetCount++;
     }
 
+    function updateAsset(uint256 _assetId, string memory _newName, uint256 _newRent) public onlyOwner {
+        Asset storage asset = assets[_assetId];
+        asset.name = _newName;
+        asset.rentPerDay = _newRent;
+    }
+
+    function removeAsset(uint256 _assetId) public onlyOwner {
+        require(assets[_assetId].renter == address(0) || block.timestamp > assets[_assetId].rentedUntil, "Asset currently rented");
+        delete assets[_assetId];
+    }
+
     function rentAsset(uint256 _assetId, uint256 _days) public payable {
         Asset storage asset = assets[_assetId];
         require(asset.renter == address(0) || block.timestamp > asset.rentedUntil, "Asset currently rented");
@@ -42,9 +53,12 @@ contract Renting {
 
         asset.renter = msg.sender;
         asset.rentedUntil = block.timestamp + (_days * 1 days);
+
+        if (msg.value > totalRent) {
+            payable(msg.sender).transfer(msg.value - totalRent); // Refund excess
+        }
     }
 
-    // 🔁 Extend rental by additional days
     function extendRental(uint256 _assetId, uint256 _additionalDays) public payable onlyRenter(_assetId) {
         Asset storage asset = assets[_assetId];
         require(block.timestamp < asset.rentedUntil, "Rental period over");
@@ -53,9 +67,12 @@ contract Renting {
         require(msg.value >= additionalRent, "Insufficient payment");
 
         asset.rentedUntil += _additionalDays * 1 days;
+
+        if (msg.value > additionalRent) {
+            payable(msg.sender).transfer(msg.value - additionalRent);
+        }
     }
 
-    // 🔓 End rental early (by renter or owner)
     function endRental(uint256 _assetId) public {
         Asset storage asset = assets[_assetId];
         require(msg.sender == asset.renter || msg.sender == owner, "Not authorized");
@@ -64,28 +81,46 @@ contract Renting {
         asset.rentedUntil = 0;
     }
 
-    // 🧾 Withdraw collected funds
     function withdrawFunds() public onlyOwner {
         payable(owner).transfer(address(this).balance);
     }
 
-    // 👥 Joint rental (two users split the rent)
     function jointRentAsset(uint256 _assetId, uint256 _days, address _partner) public payable {
         Asset storage asset = assets[_assetId];
         require(asset.renter == address(0) || block.timestamp > asset.rentedUntil, "Asset currently rented");
 
         uint256 totalRent = asset.rentPerDay * _days;
         require(msg.value >= totalRent, "Insufficient payment");
-
-        // Combine the msg.sender and partner into a "joint renter" logic (simple version)
         require(_partner != address(0) && _partner != msg.sender, "Invalid partner");
 
         asset.renter = address(uint160(uint256(keccak256(abi.encodePacked(msg.sender, _partner, block.timestamp)))));
         asset.rentedUntil = block.timestamp + (_days * 1 days);
+
+        if (msg.value > totalRent) {
+            payable(msg.sender).transfer(msg.value - totalRent);
+        }
     }
 
     function getAsset(uint256 _assetId) public view returns (string memory, uint256, address, uint256) {
         Asset memory asset = assets[_assetId];
         return (asset.name, asset.rentPerDay, asset.renter, asset.rentedUntil);
+    }
+
+    function isAssetRented(uint256 _assetId) public view returns (bool) {
+        Asset memory asset = assets[_assetId];
+        return asset.renter != address(0) && block.timestamp <= asset.rentedUntil;
+    }
+
+    function listAllAssets() public view returns (Asset[] memory) {
+        Asset[] memory allAssets = new Asset[](assetCount);
+        for (uint256 i = 0; i < assetCount; i++) {
+            allAssets[i] = assets[i];
+        }
+        return allAssets;
+    }
+
+    function changeOwner(address _newOwner) public onlyOwner {
+        require(_newOwner != address(0), "Invalid address");
+        owner = _newOwner;
     }
 }
