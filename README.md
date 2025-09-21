@@ -9,7 +9,7 @@ This smart contract enables decentralized renting of various assets such as hous
 ## 🎯 Project Vision
 To revolutionize traditional rental systems by eliminating intermediaries, enhancing transparency, reducing fraud, and enabling peer-to-peer rentals directly on the blockchain.
 
-## 🔑 Key Features
+## 🔑 Key Features:
 - **Decentralized Rental Listing**: Owners can add assets available for rent.
 - **Secure Payments**: Renters pay in Ether directly through the smart contract.
 - **Asset Management**: Ensures only available assets can be rented and returns assets back to inventory after use.
